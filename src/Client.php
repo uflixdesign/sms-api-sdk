@@ -64,8 +64,14 @@ class Client{
         }
 
         $result = json_decode($result);
-        if(!isset($result->error) OR $result->error){
-            return false;
+        if($result){
+            if(isset($result->error) AND $result->error){
+                throw new \Exception($result->msg);
+            }elseif (is_string($result->response)){
+                throw new \Exception($result->response);
+            }
+        }else{
+            throw new \Exception('Some error occurred.');
         }
 
         return $result->response;
