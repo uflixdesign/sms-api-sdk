@@ -11,7 +11,7 @@ class Client{
     protected $config, $user, $pass;
 
     const ROUTE_PROMO    = 'promo';
-    const ROUTE_PROMODND = 'promo-dnd';
+    const ROUTE_PROMODND = 'promodnd';
     const ROUTE_TRANS    = 'trans';
 
     public function __construct($user, $pass, $config = []){
