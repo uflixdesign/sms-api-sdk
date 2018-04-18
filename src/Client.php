@@ -29,7 +29,7 @@ class Client{
     protected function url($resource = ''){
         $url = "{$this->config['url']}/v{$this->config['version']}/";
         if($resource){
-            $url = $url . '/' . ltrim($resource, '/');
+            $url = $url . ltrim($resource, '/');
         }
         return $url;
     }
@@ -41,13 +41,14 @@ class Client{
      * @throws \Exception
      */
     public function APIStatus($getException = false){
-        $curl = curl_init($this->url('api-status'));
+        $url = $this->url('api-status');
+        $curl = curl_init($url);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
         $result = curl_exec($curl);
 
         try{
             if(!$result){
-                throw new \Exception('Failed to connect ' . $this->url('sms'));
+                throw new \Exception('Failed to connect ' . $url);
             }
             $result = json_decode($result);
             if($result){
