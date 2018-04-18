@@ -36,6 +36,39 @@ class Client{
 
 
     /**
+     * @param bool $getException
+     * @return bool
+     * @throws \Exception
+     */
+    public function APIStatus($getException = false){
+        $curl = curl_init($this->url('api-status'));
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+        $result = curl_exec($curl);
+
+        try{
+            if(!$result){
+                throw new \Exception('Failed to connect ' . $this->url('sms'));
+            }
+            $result = json_decode($result);
+            if($result){
+                if(isset($result->error) AND $result->error){
+                    throw new \Exception($result->msg);
+                }
+            }else{
+                throw new \Exception('Some error occurred.');
+            }
+        }catch (\Exception $e){
+            if($getException){
+                throw new \Exception($e->getMessage());
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+
+    /**
      * Sends a message to one or multiple numbers.
      * @param string|array $numbers
      * @param string $message
