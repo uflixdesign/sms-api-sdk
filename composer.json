@@ -1,6 +1,6 @@
 {
-    "name": "ufxdsms/sms-api-sdk",
-    "description": "SDK for UFLIX DESIGN - SMS API",
+    "name": "uflixdesign/sms-api-sdk",
+    "description": "SDK for UFLIX DESIGN - SMS Gateway",
     "type": "project",
     "license": "GPL-3.0-or-later",
     "authors": [
