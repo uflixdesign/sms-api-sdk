@@ -3,7 +3,7 @@
 namespace UFXDSMSAPI;
 
 /**
- * Class Client: Use to send sms through UFLIX DESIGN's SMS Gateway
+ * Class Client: Use it to send SMS / OTP verification through UFLIX DESIGN's SMS Gateway.
  * @package UFXDSMSAPI
  */
 class Client{
@@ -14,6 +14,13 @@ class Client{
     const ROUTE_PROMODND = 'promodnd';
     const ROUTE_TRANS    = 'trans';
 
+
+    /**
+     * Create a new SMS Gateway Client.
+     * @param string $user
+     * @param string $pass
+     * @param array $config
+     */
     public function __construct($user, $pass, $config = []){
         $this->config = array_merge([
             'url' => 'http://api.sms.uflixdesign.com',
@@ -26,37 +33,100 @@ class Client{
         $this->pass = $pass;
     }
 
+
+    /**
+     * Get absolute url of a resource
+     * @param string $resource
+     * @return string
+     */
     protected function url($resource = ''){
         $url = "{$this->config['url']}/v{$this->config['version']}/";
         if($resource){
-            $url = $url . '/' . ltrim($resource, '/');
+            $url = $url . ltrim($resource, '/');
         }
         return $url;
     }
 
 
     /**
-     * @param bool $getException
-     * @return bool
+     * @param string $resource
+     * @return object|array
+     * @throws \Exception
+     */
+    protected function _get($resource){
+
+        $curl = curl_init($this->url($resource));
+
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+        curl_setopt($curl, CURLOPT_USERPWD, "$this->user:$this->pass");
+
+        $result = curl_exec($curl);
+        if(!$result){
+            throw new \Exception('Failed to connect ' . $this->url('sms'));
+        }
+
+        $result = json_decode($result);
+        if(!$result){
+            throw new \Exception('Some error occurred.');
+        }
+
+        if(isset($result->error) AND $result->error){
+            throw new \Exception($result->msg);
+        }
+
+        return $result;
+    }
+
+
+    /**
+     * @param string $resource
+     * @param array $data
+     * @return object|array
+     * @throws \Exception
+     */
+    protected function _post($resource, array $data){
+
+        $curl = curl_init($this->url($resource));
+
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($curl, CURLOPT_POST, 1);
+        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data));
+        curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+        curl_setopt($curl, CURLOPT_USERPWD, "$this->user:$this->pass");
+
+        $result = curl_exec($curl);
+        if(!$result){
+            throw new \Exception('Failed to connect ' . $this->url('sms'));
+        }
+
+        $result = json_decode($result);
+        if(!$result){
+            throw new \Exception('Some error occurred.');
+        }
+
+        if(isset($result->error) AND $result->error){
+            throw new \Exception($result->msg);
+        }
+
+        return $result;
+    }
+
+
+    /**
+     * Check API status
+     * @param bool $getException if set true, get exception instead of false as return.
+     * @return bool true on success, false on failure.
      * @throws \Exception
      */
     public function APIStatus($getException = false){
-        $curl = curl_init($this->url('api-status'));
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        $result = curl_exec($curl);
 
         try{
-            if(!$result){
-                throw new \Exception('Failed to connect ' . $this->url('sms'));
+            $result = $this->_get('api-status');
+            if(isset($result->error) AND $result->error){
+                throw new \Exception($result->msg);
             }
-            $result = json_decode($result);
-            if($result){
-                if(isset($result->error) AND $result->error){
-                    throw new \Exception($result->msg);
-                }
-            }else{
-                throw new \Exception('Some error occurred.');
-            }
+
         }catch (\Exception $e){
             if($getException){
                 throw new \Exception($e->getMessage());
@@ -70,13 +140,13 @@ class Client{
 
     /**
      * Sends a message to one or multiple numbers.
-     * @param string|array $numbers
-     * @param string $message
-     * @param string $route
-     * @return string
+     * @param string|array $numbers Single Phone number if string, for multiple use array.
+     * @param string $message SMS message to be sent.
+     * @param string $route Route through which the SMS will be sent.
+     * @return object The status object.
      * @throws \Exception
      */
-    public function send($numbers, $message, $route = self::ROUTE_PROMO){
+    public function sendSMS($numbers, $message, $route = self::ROUTE_PROMO){
 
         $data = [
             'route' => $route,
@@ -84,30 +154,68 @@ class Client{
             'message' => $message
         ];
 
-        $curl = curl_init($this->url('sms'));
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($curl, CURLOPT_POST, 1);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        curl_setopt($curl, CURLOPT_USERPWD, "$this->user:$this->pass");
+        $result = $this->_post('sms', $data);
 
-        $result = curl_exec($curl);
-        if(!$result){
-            throw new \Exception('Failed to connect ' . $this->url('sms'));
-        }
-
-        $result = json_decode($result);
-        if($result){
-            if(isset($result->error) AND $result->error){
-                throw new \Exception($result->msg);
-            }elseif (is_string($result->response)){
-                throw new \Exception($result->response);
-            }
-        }else{
-            throw new \Exception('Some error occurred.');
+        if (is_string($result->response)){
+            throw new \Exception($result->response);
         }
 
         return $result->response;
+    }
+
+
+    /**
+     * Send otp to a number for verification later on.
+     * @param string $action Max length: 32 chars. An named action, that describes the OTP for.
+     * @param string $number Phone Number
+     * @param string $message A message template use {{code}} to replace with autogenerated OTP.
+     * @param int $ttl Time To Live. How much time an OTP is valid for verification.
+     * @return bool true on Success, false otherwise.
+     */
+    public function sendOTP($action, $number, $message = '', $ttl = 5){
+
+        $data = [
+            'action' => $action,
+            'number' => $number,
+            'message' => $message,
+            'ttl' => $ttl
+        ];
+
+        try{
+            $result = $this->_post('otp', $data);
+            return !$result->error;
+
+        }catch (\Exception $e){}
+
+        return false;
+
+    }
+
+
+    /**
+     * Verify otp sent to the number where you've sent OTP previously.
+     * @param string $action Max length: 32 chars. An named action, that describes the OTP for.
+     * @param string $number Phone Number
+     * @param string $code OTP sent to mobile.
+     * @return bool true on Success, false otherwise.
+     */
+    public function verifyOTP($action, $number, $code){
+
+        $data = [
+            'action' => $action,
+            'number' => $number,
+            'code' => $code
+        ];
+
+        try{
+            $result = $this->_post('otp/verify', $data);
+            if(!$result->error){
+                return true;
+            }
+        }catch (\Exception $e){}
+
+        return false;
+
     }
 
 }
